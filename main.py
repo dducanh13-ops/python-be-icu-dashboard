@@ -37,6 +37,12 @@ class PatientCreate(BaseModel):
     oxygen_saturation: int = Field(..., ge=50, le=100, example=98)
     admission_date: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
 
+# ----------------- PING ENDPOINT -----------------
+@app.get("/ping")
+def ping():
+    """Health check endpoint cho quá trình deploy (Render)"""
+    return {"status": "ok", "message": "Backend is running!"}
+
 # ----------------- CÁC ENDPOINT API -----------------
 
 @app.get("/api/patients")
