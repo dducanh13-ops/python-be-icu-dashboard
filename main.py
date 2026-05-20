@@ -183,7 +183,7 @@ def download_sample_excel():
 @app.get("/api/patients/kaggle-excel")
 def download_kaggle_excel():
     """Tải trực tiếp file dữ liệu Kaggle Sirio Libanes làm mẫu"""
-    file_path = r"d:\dashboard\Kaggle_Sirio_Libanes_ICU_Prediction.xlsx"
+    file_path = os.path.join(os.path.dirname(__file__), "Kaggle_Sirio_Libanes_ICU_Prediction.xlsx")
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Không tìm thấy tệp Kaggle Sirio Libanes trên hệ thống.")
         
