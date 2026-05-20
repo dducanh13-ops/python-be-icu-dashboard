@@ -11,7 +11,7 @@ def get_db_connection():
     return conn
 
 def init_db():
-    """Khởi tạo cơ sở dữ liệu và thêm dữ liệu mẫu nếu bảng trống"""
+    """Khởi tạo cơ sở dữ liệu và tạo bảng nếu chưa có"""
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -29,63 +29,6 @@ def init_db():
         )
     """)
     conn.commit()
-    
-    # Kiểm tra xem đã có dữ liệu chưa
-    cursor.execute("SELECT COUNT(*) FROM patients")
-    count = cursor.fetchone()[0]
-    
-    if count == 0:
-        # Nếu chưa có dữ liệu, thêm dữ liệu mẫu (30 bệnh nhân)
-        # Thiết kế dữ liệu sao cho người lớn tuổi có tỉ lệ vào ICU cao hơn
-        sample_patients = [
-            # Nhóm 0-19 tuổi (Thấp)
-            ("Nguyễn An", 12, "Nam", 0, 78, 99, "2026-05-10"),
-            ("Lê Minh", 8, "Nam", 0, 85, 98, "2026-05-11"),
-            ("Trần Vy", 17, "Nữ", 0, 72, 99, "2026-05-12"),
-            ("Phạm Hoàng", 15, "Nam", 0, 80, 97, "2026-05-12"),
-            
-            # Nhóm 20-39 tuổi (Thấp-Trung bình)
-            ("Nguyễn Văn Bình", 28, "Nam", 0, 75, 98, "2026-05-13"),
-            ("Đỗ Thị Chi", 32, "Nữ", 0, 70, 98, "2026-05-13"),
-            ("Hoàng Đức Duy", 24, "Nam", 1, 105, 94, "2026-05-14"),  # ICU do nhịp tim cao, SpO2 thấp
-            ("Phan Thanh Hải", 39, "Nam", 0, 82, 97, "2026-05-14"),
-            ("Vũ Thu Hà", 35, "Nữ", 0, 76, 99, "2026-05-15"),
-            
-            # Nhóm 40-59 tuổi (Trung bình)
-            ("Lê Văn Hùng", 45, "Nam", 0, 80, 96, "2026-05-15"),
-            ("Nguyễn Thị Hương", 52, "Nữ", 0, 78, 97, "2026-05-16"),
-            ("Trần Tuấn Kiệt", 58, "Nam", 1, 95, 92, "2026-05-16"),  # ICU
-            ("Bùi Minh Long", 48, "Nam", 0, 84, 98, "2026-05-17"),
-            ("Phạm Thanh Nga", 50, "Nữ", 1, 90, 93, "2026-05-17"),   # ICU
-            ("Ngô Tiến Phát", 55, "Nam", 0, 72, 97, "2026-05-18"),
-            
-            # Nhóm 60-79 tuổi (Cao)
-            ("Trịnh Văn Quyết", 67, "Nam", 1, 110, 89, "2026-05-18"), # ICU
-            ("Lâm Thị Mai", 72, "Nữ", 1, 95, 91, "2026-05-18"),      # ICU
-            ("Đặng Hữu Phước", 63, "Nam", 0, 78, 96, "2026-05-19"),
-            ("Võ Hoài Nam", 78, "Nam", 1, 102, 90, "2026-05-19"),     # ICU
-            ("Nguyễn Thị Thảo", 65, "Nữ", 0, 80, 97, "2026-05-19"),
-            ("Lý Hoàng Thông", 70, "Nam", 1, 88, 92, "2026-05-20"),    # ICU
-            ("Hồ Bảo Trâm", 74, "Nữ", 0, 74, 95, "2026-05-20"),
-            
-            # Nhóm 80+ tuổi (Rất cao)
-            ("Phan Văn Sơn", 82, "Nam", 1, 92, 88, "2026-05-10"),     # ICU
-            ("Trần Thị Tuyết", 89, "Nữ", 1, 98, 87, "2026-05-11"),    # ICU
-            ("Nguyễn Văn Tuyên", 85, "Nam", 1, 105, 89, "2026-05-12"),  # ICU
-            ("Lê Thị Út", 81, "Nữ", 0, 76, 95, "2026-05-13"),
-            ("Đỗ Văn Vương", 93, "Nam", 1, 112, 85, "2026-05-14"),    # ICU
-            ("Mai Thị Xuân", 87, "Nữ", 1, 85, 90, "2026-05-15"),     # ICU
-            ("Quách Văn Yến", 80, "Nam", 0, 72, 96, "2026-05-16"),
-            ("Hoàng Thị Yên", 84, "Nữ", 1, 90, 89, "2026-05-17")      # ICU
-        ]
-        
-        cursor.executemany("""
-            INSERT INTO patients (name, age, gender, icu, heart_rate, oxygen_saturation, admission_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, sample_patients)
-        conn.commit()
-        print(f"Successfully added {len(sample_patients)} sample patients to database.")
-        
     conn.close()
 
 def get_all_patients():
