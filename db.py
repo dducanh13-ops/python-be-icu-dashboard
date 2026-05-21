@@ -2,72 +2,83 @@ import sqlite3
 import os
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "patients.db")
+# Lấy đường dẫn file hiện hành để tạo file database
+current_dir = os.path.dirname(__file__)
+DB_PATH = os.path.join(current_dir, "patients.db")
 
 def get_db_connection():
-    """Tạo kết nối tới cơ sở dữ liệu SQLite và trả về đối tượng dict cho mỗi dòng"""
+    # Tạo kết nối đến SQLite
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row  # Giúp truy cập dữ liệu theo tên cột (ví dụ: row['name'])
+    # Lấy dữ liệu dưới dạng từ điển (có thể dùng tên cột)
+    conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    """Khởi tạo cơ sở dữ liệu và tạo bảng nếu chưa có"""
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Tạo bảng bệnh nhân
-    cursor.execute("""
+    # Tạo bảng nếu chưa có
+    sql = """
         CREATE TABLE IF NOT EXISTS patients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             age INTEGER NOT NULL,
             gender TEXT NOT NULL,
-            icu INTEGER NOT NULL, -- 0: Không ICU, 1: Có ICU
+            icu INTEGER NOT NULL,
             heart_rate INTEGER NOT NULL,
             oxygen_saturation INTEGER NOT NULL,
             admission_date TEXT NOT NULL
         )
-    """)
+    """
+    cursor.execute(sql)
     conn.commit()
     conn.close()
 
 def get_all_patients():
-    """Lấy danh sách tất cả bệnh nhân"""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM patients ORDER BY id DESC")
     rows = cursor.fetchall()
     
-    # Chuyển đổi thành danh sách dict để FastAPI có thể trả về JSON dễ dàng
-    patients = [dict(row) for row in rows]
+    # Chuyển đổi thành danh sách dict
+    patients = []
+    for row in rows:
+        patient_dict = dict(row)
+        patients.append(patient_dict)
+        
     conn.close()
     return patients
 
 def add_patient(name, age, gender, icu, heart_rate, oxygen_saturation, admission_date):
-    """Thêm bệnh nhân mới"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("""
+    
+    sql = """
         INSERT INTO patients (name, age, gender, icu, heart_rate, oxygen_saturation, admission_date)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (name, age, gender, icu, heart_rate, oxygen_saturation, admission_date))
+    """
+    cursor.execute(sql, (name, age, gender, icu, heart_rate, oxygen_saturation, admission_date))
     conn.commit()
+    
     new_id = cursor.lastrowid
     conn.close()
     return new_id
 
 def delete_patient(patient_id):
-    """Xóa bệnh nhân theo ID"""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM patients WHERE id = ?", (patient_id,))
     conn.commit()
+    
     rows_affected = cursor.rowcount
     conn.close()
-    return rows_affected > 0
+    
+    if rows_affected > 0:
+        return True
+    else:
+        return False
 
 def delete_all_patients():
-    """Xóa toàn bộ bệnh nhân và reset ID tăng tự động"""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM patients")
@@ -77,7 +88,6 @@ def delete_all_patients():
     return True
 
 def get_age_group(age):
-    """Phân nhóm tuổi cho bệnh nhân"""
     if age < 20:
         return "0-19"
     elif age < 40:
@@ -90,10 +100,9 @@ def get_age_group(age):
         return "80+"
 
 def get_dashboard_stats():
-    """Tính toán tất cả các chỉ số thống kê cần thiết cho Dashboard"""
     patients = get_all_patients()
-    
     total_patients = len(patients)
+    
     if total_patients == 0:
         return {
             "total_patients": 0,
@@ -102,46 +111,55 @@ def get_dashboard_stats():
             "icu_rate": 0,
             "avg_heart_rate": 0,
             "avg_oxygen": 0,
-            "age_groups": {},
-            "pie_data": {"icu": 0, "non_icu": 0}
+            "pie_data": {"icu": 0, "non_icu": 0, "icu_rate": 0},
+            "bar_data": [],
+            "line_data": []
         }
     
-    # 1. Các chỉ số KPI cơ bản
-    icu_count = sum(1 for p in patients if p['icu'] == 1)
+    icu_count = 0
+    sum_heart_rate = 0
+    sum_oxygen = 0
+    
+    # Tính tổng số ca ICU và tổng các chỉ số
+    for p in patients:
+        if p['icu'] == 1:
+            icu_count = icu_count + 1
+        sum_heart_rate = sum_heart_rate + p['heart_rate']
+        sum_oxygen = sum_oxygen + p['oxygen_saturation']
+        
     non_icu_count = total_patients - icu_count
     icu_rate = round((icu_count / total_patients) * 100, 1)
     
-    avg_heart_rate = round(sum(p['heart_rate'] for p in patients) / total_patients, 1)
-    avg_oxygen = round(sum(p['oxygen_saturation'] for p in patients) / total_patients, 1)
+    avg_heart_rate = round(sum_heart_rate / total_patients, 1)
+    avg_oxygen = round(sum_oxygen / total_patients, 1)
     
-    # 2. Dữ liệu cho Pie Chart (ICU và Không ICU)
     pie_data = {
         "icu": icu_count,
         "non_icu": non_icu_count,
         "icu_rate": icu_rate
     }
     
-    # Khởi tạo các nhóm tuổi
+    # Thống kê theo nhóm tuổi
     age_groups_list = ["0-19", "20-39", "40-59", "60-79", "80+"]
-    age_stats = {
-        group: {
+    
+    age_stats = {}
+    for group in age_groups_list:
+        age_stats[group] = {
             "total": 0,
             "icu": 0,
             "heart_rate_sum": 0,
             "oxygen_sum": 0
-        } for group in age_groups_list
-    }
-    
+        }
+        
     # Phân nhóm bệnh nhân
     for p in patients:
         group = get_age_group(p['age'])
-        age_stats[group]["total"] += 1
-        age_stats[group]["heart_rate_sum"] += p['heart_rate']
-        age_stats[group]["oxygen_sum"] += p['oxygen_saturation']
+        age_stats[group]["total"] = age_stats[group]["total"] + 1
+        age_stats[group]["heart_rate_sum"] = age_stats[group]["heart_rate_sum"] + p['heart_rate']
+        age_stats[group]["oxygen_sum"] = age_stats[group]["oxygen_sum"] + p['oxygen_saturation']
         if p['icu'] == 1:
-            age_stats[group]["icu"] += 1
+            age_stats[group]["icu"] = age_stats[group]["icu"] + 1
             
-    # Tính toán kết quả cho Bar Chart và Line Chart theo nhóm tuổi
     bar_data = []
     line_data = []
     
@@ -149,11 +167,15 @@ def get_dashboard_stats():
         stats = age_stats[group]
         total = stats["total"]
         
-        # Tính tỉ lệ ICU của từng nhóm
-        group_icu_rate = round((stats["icu"] / total) * 100, 1) if total > 0 else 0
-        avg_hr = round(stats["heart_rate_sum"] / total, 1) if total > 0 else 0
-        avg_o2 = round(stats["oxygen_sum"] / total, 1) if total > 0 else 0
-        
+        if total > 0:
+            group_icu_rate = round((stats["icu"] / total) * 100, 1)
+            avg_hr = round(stats["heart_rate_sum"] / total, 1)
+            avg_o2 = round(stats["oxygen_sum"] / total, 1)
+        else:
+            group_icu_rate = 0
+            avg_hr = 0
+            avg_o2 = 0
+            
         bar_data.append({
             "age_group": group,
             "total_patients": total,
@@ -180,7 +202,6 @@ def get_dashboard_stats():
     }
 
 def get_time_series_data():
-    """Lấy dữ liệu chuỗi thời gian của bệnh nhân nhập viện theo ngày"""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -195,18 +216,18 @@ def get_time_series_data():
     """)
     rows = cursor.fetchall()
     conn.close()
-    return [
-        {
+    
+    result = []
+    for r in rows:
+        result.append({
             "admission_date": r[0],
             "patient_count": r[1],
             "avg_heart_rate": r[2],
             "avg_oxygen_saturation": r[3]
-        }
-        for r in rows
-    ]
+        })
+    return result
 
 def get_risk_matrix_data():
-    """Lấy danh sách bệnh nhân phân loại theo SpO2 và Nhịp tim để làm Ma trận rủi ro"""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id, name, age, gender, icu, heart_rate, oxygen_saturation, admission_date FROM patients")
@@ -215,9 +236,15 @@ def get_risk_matrix_data():
     
     classified = []
     for r in rows:
-        p_id, name, age, gender, icu, hr, spo2, date = r
+        p_id = r[0]
+        name = r[1]
+        age = r[2]
+        gender = r[3]
+        icu = r[4]
+        hr = r[5]
+        spo2 = r[6]
+        date = r[7]
         
-        # Phân loại SpO2: low (<90), medium (90-94), high (>=95)
         if spo2 >= 95:
             spo2_cat = "high"
         elif spo2 >= 90:
@@ -225,7 +252,6 @@ def get_risk_matrix_data():
         else:
             spo2_cat = "low"
             
-        # Phân loại Nhịp tim: bradycardia (<60), normal (60-100), tachycardia (>100)
         if hr < 60:
             hr_cat = "bradycardia"
         elif hr <= 100:
@@ -248,14 +274,13 @@ def get_risk_matrix_data():
     return classified
 
 def get_advanced_stats():
-    """Tính toán hệ số tương quan (Pearson) và tỷ số Rủi ro tương đối (Relative Risk)"""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT age, oxygen_saturation, heart_rate, icu FROM patients")
     rows = cursor.fetchall()
     conn.close()
     
-    if not rows:
+    if len(rows) == 0:
         return {
             "age_spo2_corr": 0,
             "age_hr_corr": 0,
@@ -268,38 +293,83 @@ def get_advanced_stats():
             "younger_icu": 0
         }
         
-    ages = [r[0] for r in rows]
-    spo2s = [r[1] for r in rows]
-    hrs = [r[2] for r in rows]
-    icus = [r[3] for r in rows]
+    ages = []
+    spo2s = []
+    hrs = []
+    icus = []
+    
+    for r in rows:
+        ages.append(r[0])
+        spo2s.append(r[1])
+        hrs.append(r[2])
+        icus.append(r[3])
     
     n = len(rows)
     
+    # Tính hệ số tương quan
     def correlation(x, y):
-        mean_x = sum(x) / n
-        mean_y = sum(y) / n
-        num = sum((xi - mean_x) * (yi - mean_y) for xi, yi in zip(x, y))
-        den_x = sum((xi - mean_x) ** 2 for xi in x)
-        den_y = sum((yi - mean_y) ** 2 for yi in y)
+        sum_x = 0
+        sum_y = 0
+        for i in range(n):
+            sum_x = sum_x + x[i]
+            sum_y = sum_y + y[i]
+            
+        mean_x = sum_x / n
+        mean_y = sum_y / n
+        
+        num = 0
+        den_x = 0
+        den_y = 0
+        
+        for i in range(n):
+            dx = x[i] - mean_x
+            dy = y[i] - mean_y
+            num = num + (dx * dy)
+            den_x = den_x + (dx * dx)
+            den_y = den_y + (dy * dy)
+            
         if den_x == 0 or den_y == 0:
             return 0
+            
         return round(num / ((den_x * den_y) ** 0.5), 3)
         
     age_spo2_corr = correlation(ages, spo2s)
     age_hr_corr = correlation(ages, hrs)
     
-    # Tính Rủi ro tương đối (Relative Risk) cho người lớn tuổi (>= 60) so với người trẻ (< 60)
-    elderly_total = sum(1 for a in ages if a >= 60)
-    elderly_icu = sum(1 for a, icu in zip(ages, icus) if a >= 60 and icu == 1)
+    elderly_total = 0
+    elderly_icu = 0
+    younger_total = 0
+    younger_icu = 0
     
-    younger_total = sum(1 for a in ages if a < 60)
-    younger_icu = sum(1 for a, icu in zip(ages, icus) if a < 60 and icu == 1)
-    
-    elderly_risk = (elderly_icu / elderly_total) if elderly_total > 0 else 0
-    younger_risk = (younger_icu / younger_total) if younger_total > 0 else 0
-    
-    relative_risk = round(elderly_risk / younger_risk, 2) if younger_risk > 0 else (99.9 if elderly_risk > 0 else 1.0)
-    
+    for i in range(n):
+        age = ages[i]
+        icu = icus[i]
+        if age >= 60:
+            elderly_total = elderly_total + 1
+            if icu == 1:
+                elderly_icu = elderly_icu + 1
+        else:
+            younger_total = younger_total + 1
+            if icu == 1:
+                younger_icu = younger_icu + 1
+                
+    if elderly_total > 0:
+        elderly_risk = elderly_icu / elderly_total
+    else:
+        elderly_risk = 0
+        
+    if younger_total > 0:
+        younger_risk = younger_icu / younger_total
+    else:
+        younger_risk = 0
+        
+    if younger_risk > 0:
+        relative_risk = round(elderly_risk / younger_risk, 2)
+    elif elderly_risk > 0:
+        relative_risk = 99.9
+    else:
+        relative_risk = 1.0
+        
     return {
         "age_spo2_corr": age_spo2_corr,
         "age_hr_corr": age_hr_corr,
@@ -313,19 +383,24 @@ def get_advanced_stats():
     }
 
 def get_forecast_data():
-    """Dự báo số lượng bệnh nhân nhập viện trong 7 ngày tới sử dụng Hồi quy tuyến tính"""
     time_series = get_time_series_data()
-    if not time_series:
+    if len(time_series) == 0:
         return []
         
     n = len(time_series)
     from datetime import datetime, timedelta
     
     if n < 2:
-        last_val = time_series[0]["patient_count"] if n == 1 else 0
-        forecast = []
-        last_date_str = time_series[0]["admission_date"] if n == 1 else datetime.now().strftime("%Y-%m-%d")
+        if n == 1:
+            last_val = time_series[0]["patient_count"]
+            last_date_str = time_series[0]["admission_date"]
+        else:
+            last_val = 0
+            last_date_str = datetime.now().strftime("%Y-%m-%d")
+            
         last_date = datetime.strptime(last_date_str, "%Y-%m-%d")
+        
+        forecast = []
         for i in range(1, 8):
             next_date = last_date + timedelta(days=i)
             forecast.append({
@@ -335,32 +410,51 @@ def get_forecast_data():
             })
         return forecast
         
-    # Tính đường hồi quy tuyến tính: y = m * x + c
-    x = list(range(n))
-    y = [d["patient_count"] for d in time_series]
+    # Tính đường hồi quy tuyến tính (y = m * x + c)
+    x = []
+    y = []
+    for i in range(n):
+        x.append(i)
+        y.append(time_series[i]["patient_count"])
     
-    mean_x = sum(x) / n
-    mean_y = sum(y) / n
+    sum_x = 0
+    sum_y = 0
+    for i in range(n):
+        sum_x = sum_x + x[i]
+        sum_y = sum_y + y[i]
+        
+    mean_x = sum_x / n
+    mean_y = sum_y / n
     
-    num = sum((xi - mean_x) * (yi - mean_y) for xi, yi in zip(x, y))
-    den = sum((xi - mean_x) ** 2 for xi in x)
-    
-    m = num / den if den != 0 else 0
+    num = 0
+    den = 0
+    for i in range(n):
+        dx = x[i] - mean_x
+        dy = y[i] - mean_y
+        num = num + (dx * dy)
+        den = den + (dx * dx)
+        
+    if den != 0:
+        m = num / den
+    else:
+        m = 0
+        
     c = mean_y - m * mean_x
     
-    # Dự báo tiếp 7 ngày từ ngày cuối cùng trong chuỗi thời gian
     last_date_str = time_series[-1]["admission_date"]
     last_date = datetime.strptime(last_date_str, "%Y-%m-%d")
     
     forecast = []
     for i in range(1, 8):
         next_date = last_date + timedelta(days=i)
-        projected_x = n - 1 + i
-        projected_y = max(0, m * projected_x + c) # Không cho phép số lượng âm
+        projected_x = (n - 1) + i
+        projected_y = m * projected_x + c
+        if projected_y < 0:
+            projected_y = 0
+            
         forecast.append({
             "admission_date": next_date.strftime("%Y-%m-%d"),
             "patient_count": round(projected_y, 1),
             "is_forecast": True
         })
     return forecast
-
