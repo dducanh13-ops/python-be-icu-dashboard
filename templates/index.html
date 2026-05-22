@@ -532,5 +532,155 @@
             </form>
         </div>
     </div>
+
+    <script>
+        // ======================================================
+        // Upload Area: Kéo thả & Nhấn để chọn file
+        // ======================================================
+        (function () {
+            var uploadArea     = document.getElementById('upload-area');
+            var fileInput      = document.getElementById('file-excel');
+            var placeholder    = document.getElementById('upload-placeholder');
+            var fileInfo       = document.getElementById('upload-file-info');
+            var fileNameSpan   = document.getElementById('selected-filename');
+            var btnRemove      = document.getElementById('btn-remove-file');
+            var btnSubmit      = document.getElementById('btn-upload-submit');
+            var notifContainer = document.getElementById('notification-container');
+
+            if (!uploadArea || !fileInput) return;
+
+            // --- Hiển thị thông báo ---
+            function showNotification(message, type) {
+                type = type || 'success';
+                var notif = document.createElement('div');
+                notif.className = 'notification ' + type;
+                notif.innerHTML = '<i class="fa-solid ' + (type === 'success' ? 'fa-circle-check' : 'fa-circle-xmark') + '"></i> ' + message;
+                notifContainer.appendChild(notif);
+                setTimeout(function () {
+                    notif.classList.add('fade-out');
+                    setTimeout(function () { notif.remove(); }, 500);
+                }, 4000);
+            }
+
+            // --- Khi có file được chọn ---
+            function handleFile(file) {
+                if (!file) return;
+                var name = file.name.toLowerCase();
+                if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+                    showNotification('Chỉ hỗ trợ file .xlsx hoặc .xls!', 'error');
+                    return;
+                }
+                fileNameSpan.textContent = file.name;
+                placeholder.classList.add('hidden');
+                fileInfo.classList.remove('hidden');
+                btnSubmit.classList.remove('hidden');
+                uploadArea.classList.add('has-file');
+            }
+
+            // --- Reset về trạng thái ban đầu ---
+            function resetUpload() {
+                fileInput.value = '';
+                placeholder.classList.remove('hidden');
+                fileInfo.classList.add('hidden');
+                btnSubmit.classList.add('hidden');
+                uploadArea.classList.remove('has-file', 'drag-over');
+            }
+
+            // --- Click vào vùng upload ---
+            uploadArea.addEventListener('click', function () {
+                fileInput.click();
+            });
+
+            // --- Chọn file qua input ---
+            fileInput.addEventListener('change', function () {
+                if (fileInput.files && fileInput.files.length > 0) {
+                    handleFile(fileInput.files[0]);
+                }
+            });
+
+            // --- Nút xoá file đã chọn ---
+            btnRemove.addEventListener('click', function (e) {
+                e.stopPropagation();
+                resetUpload();
+            });
+
+            // --- Kéo thả ---
+            uploadArea.addEventListener('dragover', function (e) {
+                e.preventDefault();
+                uploadArea.classList.add('drag-over');
+            });
+            uploadArea.addEventListener('dragleave', function () {
+                uploadArea.classList.remove('drag-over');
+            });
+            uploadArea.addEventListener('drop', function (e) {
+                e.preventDefault();
+                uploadArea.classList.remove('drag-over');
+                var files = e.dataTransfer.files;
+                if (files && files.length > 0) {
+                    handleFile(files[0]);
+                    // Gán file vào input để có thể đọc sau
+                    try {
+                        var dt = new DataTransfer();
+                        dt.items.add(files[0]);
+                        fileInput.files = dt.files;
+                    } catch (err) { /* Safari fallback - sẽ lưu file trong biến */ }
+                    window._droppedFile = files[0];
+                }
+            });
+
+            // --- Nút "Import Dữ Liệu" ---
+            btnSubmit.addEventListener('click', function () {
+                var file = (fileInput.files && fileInput.files.length > 0)
+                    ? fileInput.files[0]
+                    : window._droppedFile;
+
+                if (!file) {
+                    showNotification('Vui lòng chọn file Excel trước!', 'error');
+                    return;
+                }
+
+                btnSubmit.disabled = true;
+                btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nhập dữ liệu...';
+
+                var formData = new FormData();
+                formData.append('file', file);
+
+                fetch('/api/patients/import', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(function (res) { return res.json(); })
+                .then(function (data) {
+                    if (data.status === 'success') {
+                        showNotification(data.message || 'Import thành công!', 'success');
+                        resetUpload();
+                        window._droppedFile = null;
+                        // Tải lại trang để cập nhật số liệu
+                        setTimeout(function () { location.reload(); }, 1500);
+                    } else {
+                        showNotification(data.detail || 'Import thất bại.', 'error');
+                    }
+                })
+                .catch(function (err) {
+                    showNotification('Lỗi kết nối: ' + err.message, 'error');
+                })
+                .finally(function () {
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = '<i class="fa-solid fa-circle-check"></i> Import Dữ Liệu';
+                });
+            });
+        })();
+
+        // ======================================================
+        // Cập nhật ngày hiện tại
+        // ======================================================
+        (function () {
+            var el = document.getElementById('current-date');
+            if (el) {
+                var now = new Date();
+                el.textContent = now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            }
+        })();
+    </script>
 </body>
 </html>
