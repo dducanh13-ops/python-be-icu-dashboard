@@ -399,7 +399,7 @@ async def import_patients_excel(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail="Lỗi xử lý file: " + str(e))
 
-frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "python-dashboard-fe"))
+frontend_dir = os.path.dirname(__file__)
 if os.path.exists(frontend_dir):
     static_dir = os.path.join(frontend_dir, "static")
     if os.path.exists(static_dir):
