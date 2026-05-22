@@ -1273,6 +1273,24 @@ tr:hover td {
     text-align: left;
     gap: 0.15rem;
     min-width: 0;
+    overflow: hidden;
+}
+
+/* Increase text readability over colored tiles */
+.treemap-block::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(120% 85% at 0% 100%, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.15) 55%, rgba(0,0,0,0.0) 100%),
+        linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0.0) 60%);
+    pointer-events: none;
+}
+
+.treemap-block > * {
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 1px 12px rgba(0,0,0,0.35);
 }
 
 .treemap-block:hover {
@@ -1308,10 +1326,20 @@ tr:hover td {
     font-size: 0.7rem;
     font-weight: 600;
     margin-top: 4px;
-    background: rgba(0, 0, 0, 0.25);
+    background: rgba(0, 0, 0, 0.35);
     padding: 2px 6px;
     border-radius: 4px;
     white-space: nowrap;
+}
+
+/* Compact tiles: hide the long label to avoid clutter */
+.treemap-block.is-compact .block-label {
+    display: none;
+}
+
+/* Tiny tiles: keep only the count */
+.treemap-block.is-tiny .block-icu {
+    display: none;
 }
 
 /* Improve density on small Treemap tiles */

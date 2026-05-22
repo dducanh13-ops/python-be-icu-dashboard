@@ -928,6 +928,8 @@
                     var bd = icuRate > 50 ? 'rgba(244,63,94,0.6)' : icuRate > 20 ? 'rgba(249,115,22,0.6)' : 'rgba(16,185,129,0.6)';
                     var div = document.createElement('div');
                     div.className = 'treemap-block';
+                    if (w < 110 || h < 70) div.classList.add('is-compact');
+                    if (w < 75 || h < 55) div.classList.add('is-tiny');
                     div.style.cssText = 'position:absolute;left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px;box-sizing:border-box;background:'+bg+';border:1px solid '+bd+';';
                     div.innerHTML = '' +
                         '<div class="block-label">' + item.label + '</div>' +
@@ -1043,10 +1045,11 @@
                     function setWidth(id, pct) { var el = document.getElementById(id); if (el) el.style.width = pct + '%'; }
                     function corrDesc(c) {
                         var a = Math.abs(c);
-                        if (a > 0.7) return (c < 0 ? 'Tương quan nghịch rất mạnh' : 'Tương quan thuận rất mạnh');
-                        if (a > 0.4) return (c < 0 ? 'Tương quan nghịch trung bình' : 'Tương quan thuận trung bình');
-                        if (a > 0.2) return (c < 0 ? 'Tương quan nghịch yếu' : 'Tương quan thuận yếu');
-                        return 'Không có tương quan rõ rệt';
+                        if (a >= 0.8) return (c < 0 ? 'Tương quan nghịch rất mạnh' : 'Tương quan thuận rất mạnh');
+                        if (a >= 0.6) return (c < 0 ? 'Tương quan nghịch mạnh' : 'Tương quan thuận mạnh');
+                        if (a >= 0.4) return (c < 0 ? 'Tương quan nghịch trung bình' : 'Tương quan thuận trung bình');
+                        if (a >= 0.2) return (c < 0 ? 'Tương quan nghịch yếu' : 'Tương quan thuận yếu');
+                        return 'Tương quan rất yếu (gần như không đáng kể)';
                     }
                     setEl('stat-corr-age-spo2', stats.age_spo2_corr.toFixed(3));
                     setWidth('progress-age-spo2', Math.abs(stats.age_spo2_corr) * 100);
