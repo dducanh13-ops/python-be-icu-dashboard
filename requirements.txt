@@ -3,3 +3,4 @@ uvicorn
 gunicorn
 openpyxl
 python-multipart
+jinja2
