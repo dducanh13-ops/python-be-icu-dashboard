@@ -413,13 +413,33 @@ if os.path.exists(frontend_dir):
         async def home(request: Request, tab: str = "dashboard"):
             stats = db.get_dashboard_stats()
             patients = db.get_all_patients()
+            page_titles = {
+                "dashboard": "Dashboard Phân Tích Bệnh Nhân ICU",
+                "patients": "Danh Sách Bệnh Nhân ICU",
+                "help": "Hướng Dẫn Sử Dụng Hệ Thống",
+                "risk": "Bản Đồ & Ma Trận Rủi Ro",
+                "timeseries": "Chuỗi Thời Gian & Dự Báo",
+                "deep": "Phân Tích Sâu (Nâng Cao)"
+            }
+            page_subtitles = {
+                "dashboard": "Dữ liệu phân tích lâm sàng và tỷ lệ tiếp nhận phòng điều trị tích cực",
+                "patients": "Danh sách chi tiết bệnh nhân và bộ lọc tìm kiếm",
+                "help": "Tài liệu hướng dẫn thao tác và nhập dữ liệu",
+                "risk": "Phân loại rủi ro theo SpO2, nhịp tim và tỷ lệ ICU",
+                "timeseries": "Theo dõi xu hướng nhập viện và dự báo 7 ngày tiếp theo",
+                "deep": "Phân tích thống kê nâng cao và báo cáo dịch tễ"
+            }
+            page_title = page_titles.get(tab, page_titles["dashboard"])
+            page_subtitle = page_subtitles.get(tab, page_subtitles["dashboard"])
             return templates.TemplateResponse(
                 request=request,
                 name="index.html",
                 context={
                     "tab": tab,
                     "stats": stats,
-                    "patients": patients
+                    "patients": patients,
+                    "page_title": page_title,
+                    "page_subtitle": page_subtitle
                 }
             )
             

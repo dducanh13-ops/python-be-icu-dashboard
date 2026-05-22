@@ -32,6 +32,15 @@
                     <li class="nav-item {% if tab == 'dashboard' %}active{% endif %}" data-tab="dashboard">
                         <a href="/?tab=dashboard"><i class="fa-solid fa-chart-pie"></i><span>Tổng Quan</span></a>
                     </li>
+                    <li class="nav-item {% if tab == 'risk' %}active{% endif %}" data-tab="risk">
+                        <a href="/?tab=risk"><i class="fa-solid fa-table-cells"></i><span>Bản Đồ & Ma Trận Rủi Ro</span></a>
+                    </li>
+                    <li class="nav-item {% if tab == 'timeseries' %}active{% endif %}" data-tab="timeseries">
+                        <a href="/?tab=timeseries"><i class="fa-solid fa-chart-area"></i><span>Chuỗi Thời Gian & Dự Báo</span></a>
+                    </li>
+                    <li class="nav-item {% if tab == 'deep' %}active{% endif %}" data-tab="deep">
+                        <a href="/?tab=deep"><i class="fa-solid fa-flask"></i><span>Phân Tích Sâu</span></a>
+                    </li>
                     <li class="nav-item {% if tab == 'patients' %}active{% endif %}" data-tab="patients">
                         <a href="/?tab=patients"><i class="fa-solid fa-database"></i><span>Dữ Liệu Chi Tiết</span></a>
                     </li>
@@ -84,8 +93,8 @@
             <!-- Top Header -->
             <header class="top-header">
                 <div class="header-title">
-                    <h1 id="page-title">Dashboard Phân Tích Bệnh Nhân ICU</h1>
-                    <p class="text-muted" id="page-subtitle">Dữ liệu phân tích lâm sàng và tỷ lệ tiếp nhận phòng điều trị tích cực</p>
+                    <h1 id="page-title">{{ page_title }}</h1>
+                    <p class="text-muted" id="page-subtitle">{{ page_subtitle }}</p>
                 </div>
                 <div class="header-actions">
                     <div class="date-badge">
@@ -288,7 +297,7 @@
             </section>
 
             <!-- Phân Tích Rủi Ro (Treemap & Ma trận Rủi ro) -->
-            <section class="tab-content hidden" id="tab-risk">
+            <section class="tab-content {% if tab != 'risk' %}hidden{% endif %}" id="tab-risk">
                 <div class="risk-analysis-grid">
                     <!-- Bản đồ Rủi ro (Treemap) -->
                     <div class="chart-card glass">
@@ -374,7 +383,7 @@
             </section>
 
             <!-- Chuỗi Thời Gian & Dự Báo -->
-            <section class="tab-content hidden" id="tab-timeseries">
+            <section class="tab-content {% if tab != 'timeseries' %}hidden{% endif %}" id="tab-timeseries">
                 <div class="charts-grid">
                     <!-- Chuỗi thời gian -->
                     <div class="chart-card glass">
@@ -407,7 +416,7 @@
             </section>
 
             <!-- Phân Tích Sâu (Nâng cao) -->
-            <section class="tab-content hidden" id="tab-deep">
+            <section class="tab-content {% if tab != 'deep' %}hidden{% endif %}" id="tab-deep">
                 <div class="deep-analysis-container">
                     <!-- KPI chỉ số tương quan -->
                     <div class="deep-kpi-grid">
