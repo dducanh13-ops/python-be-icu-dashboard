@@ -20,7 +20,7 @@ py -m venv .venv
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
-uvicorn main:app --reload
+python -m uvicorn main:app --reload
 ```
 
 Mở trình duyệt:
@@ -37,7 +37,7 @@ Repo hiện có thư mục `venv/`. Bạn có thể thử:
 cd d:\dashboard\python-dashboard
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-uvicorn main:app --reload
+python -m uvicorn main:app --reload
 ```
 
 ## Ghi chú

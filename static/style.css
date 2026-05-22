@@ -1254,7 +1254,7 @@ tr:hover td {
 .treemap-container {
     position: relative;
     width: 100%;
-    height: 320px;
+    height: 360px;
     display: block;
     overflow: hidden;
 }
@@ -1285,12 +1285,21 @@ tr:hover td {
     justify-content: center;
     align-items: center;
     text-align: center;
+    gap: 0.15rem;
 }
 
 .treemap-block.is-tiny .block-count {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     line-height: 1;
     white-space: nowrap;
+}
+
+.treemap-block.is-tiny .block-icu {
+    display: inline-block;
+    font-size: 0.65rem;
+    margin-top: 0;
+    padding: 1px 5px;
+    background: rgba(0, 0, 0, 0.28);
 }
 
 /* Increase text readability over colored tiles */
@@ -1354,17 +1363,15 @@ tr:hover td {
 }
 
 /* Tiny tiles: keep only the count */
-.treemap-block.is-tiny .block-icu {
-    display: none;
-}
+/* Note: ICU% may be conditionally injected for tiny tiles in JS when there is enough space. */
 
 /* Improve density on small Treemap tiles */
 @media (max-width: 900px) {
     .treemap-container {
-        height: 300px;
+        height: 320px;
     }
     .treemap-wrapper {
-        min-height: 300px;
+        min-height: 320px;
     }
     .treemap-block {
         padding: 0.5rem 0.6rem;
