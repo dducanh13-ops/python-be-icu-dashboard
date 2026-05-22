@@ -1,7 +1,8 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 import os
 import openpyxl
@@ -400,6 +401,44 @@ async def import_patients_excel(file: UploadFile = File(...)):
 
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "python-dashboard-fe"))
 if os.path.exists(frontend_dir):
-    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="static")
+    static_dir = os.path.join(frontend_dir, "static")
+    if os.path.exists(static_dir):
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+        
+    templates_dir = os.path.join(frontend_dir, "templates")
+    if os.path.exists(templates_dir):
+        templates = Jinja2Templates(directory=templates_dir)
+        
+        @app.get("/")
+        async def home(request: Request, tab: str = "dashboard"):
+            stats = db.get_dashboard_stats()
+            patients = db.get_all_patients()
+            return templates.TemplateResponse(
+                request=request,
+                name="index.html",
+                context={
+                    "tab": tab,
+                    "stats": stats,
+                    "patients": patients
+                }
+            )
+            
+        @app.post("/create")
+        async def create_patient_form(
+            name: str = Form(...),
+            age: int = Form(...),
+            gender: str = Form(...),
+            icu: int = Form(...),
+            heart_rate: int = Form(...),
+            oxygen_saturation: int = Form(...),
+            admission_date: str = Form(...)
+        ):
+            db.add_patient(name, age, gender, icu, heart_rate, oxygen_saturation, admission_date)
+            return RedirectResponse(url="/?tab=patients", status_code=303)
+            
+        @app.get("/delete/{patient_id}")
+        async def delete_patient_route(patient_id: int):
+            db.delete_patient(patient_id)
+            return RedirectResponse(url="/?tab=patients", status_code=303)
 else:
     print("Warning: Frontend directory not found at " + frontend_dir)
