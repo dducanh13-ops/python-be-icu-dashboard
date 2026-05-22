@@ -419,7 +419,8 @@ if os.path.exists(frontend_dir):
                 "help": "Hướng Dẫn Sử Dụng Hệ Thống",
                 "risk": "Bản Đồ & Ma Trận Rủi Ro",
                 "timeseries": "Chuỗi Thời Gian & Dự Báo",
-                "deep": "Phân Tích Sâu (Nâng Cao)"
+                "deep": "Phân Tích Sâu (Nâng Cao)",
+                "create": "Thêm Bệnh Nhân Mới"
             }
             page_subtitles = {
                 "dashboard": "Dữ liệu phân tích lâm sàng và tỷ lệ tiếp nhận phòng điều trị tích cực",
@@ -427,7 +428,8 @@ if os.path.exists(frontend_dir):
                 "help": "Tài liệu hướng dẫn thao tác và nhập dữ liệu",
                 "risk": "Phân loại rủi ro theo SpO2, nhịp tim và tỷ lệ ICU",
                 "timeseries": "Theo dõi xu hướng nhập viện và dự báo 7 ngày tiếp theo",
-                "deep": "Phân tích thống kê nâng cao và báo cáo dịch tễ"
+                "deep": "Phân tích thống kê nâng cao và báo cáo dịch tễ",
+                "create": "Nhập thông tin bệnh nhân và lưu vào SQLite"
             }
             page_title = page_titles.get(tab, page_titles["dashboard"])
             page_subtitle = page_subtitles.get(tab, page_subtitles["dashboard"])

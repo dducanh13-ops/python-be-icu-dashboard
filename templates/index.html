@@ -522,7 +522,7 @@
     </div>
 
     <!-- Modal Form: Add Patient -->
-    <div class="modal-overlay" id="modal-patient" {% if tab == 'create' %}style="display: flex;"{% endif %}>
+    <div class="modal-overlay{% if tab == 'create' %} show{% endif %}" id="modal-patient">
         <div class="modal-card glass">
             <div class="modal-header">
                 <h2><i class="fa-solid fa-user-plus"></i> Thêm Bệnh Nhân Mới</h2>
@@ -931,10 +931,16 @@
                     if (w < 110 || h < 70) div.classList.add('is-compact');
                     if (w < 75 || h < 55) div.classList.add('is-tiny');
                     div.style.cssText = 'position:absolute;left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px;box-sizing:border-box;background:'+bg+';border:1px solid '+bd+';';
-                    div.innerHTML = '' +
-                        '<div class="block-label">' + item.label + '</div>' +
-                        '<div class="block-count"><strong>' + item.count + '</strong> BN</div>' +
-                        '<div class="block-icu" style="color:' + bd + ';">ICU: ' + icuRate + '%</div>';
+                    // For very small tiles, show only the number so it doesn't get clipped.
+                    if (div.classList.contains('is-tiny')) {
+                        div.innerHTML = '<div class="block-count"><strong>' + item.count + '</strong></div>';
+                    } else {
+                        div.innerHTML = '' +
+                            '<div class="block-label">' + item.label + '</div>' +
+                            '<div class="block-count"><strong>' + item.count + '</strong> BN</div>' +
+                            '<div class="block-icu" style="color:' + bd + ';">ICU: ' + icuRate + '%</div>';
+                    }
+                    div.title = item.label + ' — ' + item.count + ' BN — ICU: ' + icuRate + '%';
                     container.appendChild(div);
                 });
                 var el = document.getElementById('treemap-analysis-text');

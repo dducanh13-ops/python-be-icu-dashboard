@@ -1276,6 +1276,23 @@ tr:hover td {
     overflow: hidden;
 }
 
+.treemap-block.is-compact {
+    padding: 0.45rem 0.55rem;
+}
+
+.treemap-block.is-tiny {
+    padding: 0.2rem 0.25rem;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.treemap-block.is-tiny .block-count {
+    font-size: 0.85rem;
+    line-height: 1;
+    white-space: nowrap;
+}
+
 /* Increase text readability over colored tiles */
 .treemap-block::before {
     content: '';
@@ -1294,7 +1311,6 @@ tr:hover td {
 }
 
 .treemap-block:hover {
-    transform: scale(1.02);
     box-shadow: var(--shadow-md);
     filter: brightness(1.15);
     border-color: rgba(255, 255, 255, 0.2);
