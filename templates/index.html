@@ -4,12 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ICU Patient Analytics Dashboard</title>
-    <!-- Google Fonts: Inter -->
+    <!-- Google Fonts: Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- FontAwesome for Premium Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- Custom Style CSS -->
     <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -148,14 +150,58 @@
                     </div>
                 </div>
 
-                <!-- Charts (Disabled in SSR) -->
+                <!-- Charts Grid -->
                 <div class="charts-grid">
+                    <!-- Pie Chart: ICU vs Non-ICU -->
                     <div class="chart-card glass">
                         <div class="chart-header">
-                            <h3>Lưu ý: Biểu đồ đã bị vô hiệu hóa vì không sử dụng JavaScript.</h3>
+                            <h3>Phân Phối Ca Bệnh Điều Trị</h3>
+                            <p class="chart-subtitle">Tỉ lệ phần trăm bệnh nhân điều trị ICU và điều trị thường</p>
+                        </div>
+                        <div class="chart-wrapper pie-wrapper">
+                            <canvas id="chart-icu-pie"></canvas>
+                        </div>
+                        <div class="chart-footer">
+                            <p id="pie-analysis-text" class="analysis-text">Đang tải phân tích...</p>
                         </div>
                     </div>
-                    <!-- Chart section removed for SSR -->
+
+                    <!-- Bar Chart: ICU by Age Groups -->
+                    <div class="chart-card glass">
+                        <div class="chart-header">
+                            <h3>Tỷ Lệ Nhập ICU Theo Nhóm Tuổi</h3>
+                            <p class="chart-subtitle">So sánh số ca và tỷ lệ % vào ICU giữa các nhóm tuổi</p>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="chart-age-bar"></canvas>
+                        </div>
+                        <div class="chart-footer">
+                            <p id="bar-analysis-text" class="analysis-text">Đang tải phân tích...</p>
+                        </div>
+                    </div>
+
+                    <!-- Line Chart: Health metrics by Age Group -->
+                    <div class="chart-card glass col-span-2">
+                        <div class="chart-header">
+                            <div class="flex-between">
+                                <div>
+                                    <h3>Chỉ Số Sức Khỏe Trung Bình Theo Độ Tuổi</h3>
+                                    <p class="chart-subtitle">Mối quan hệ giữa Nhịp tim (BPM) và Độ bão hòa oxy máu SpO2 (%) của các độ tuổi</p>
+                                </div>
+                                <div class="chart-selectors">
+                                    <button class="selector-btn active" id="btn-both" onclick="updateLineChartMetric('both')">Cả hai</button>
+                                    <button class="selector-btn" id="btn-heart" onclick="updateLineChartMetric('heart')">Nhịp tim</button>
+                                    <button class="selector-btn" id="btn-oxygen" onclick="updateLineChartMetric('oxygen')">SpO2</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chart-wrapper line-wrapper">
+                            <canvas id="chart-metrics-line"></canvas>
+                        </div>
+                        <div class="chart-footer">
+                            <p id="line-analysis-text" class="analysis-text">Đang tải phân tích...</p>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -535,7 +581,488 @@
 
     <script>
         // ======================================================
-        // Upload Area: Kéo thả & Nhấn để chọn file
+        // DỮ LIỆU TỪ SERVER (Jinja2 Template)
+        // ======================================================
+        var SERVER_DATA = {
+            stats:    {{ stats | tojson }},
+            barData:  {{ stats.bar_data | tojson }},
+            lineData: {{ stats.line_data | tojson }},
+            pieData:  {{ stats.pie_data | tojson }}
+        };
+
+        // ======================================================
+        // CHART.JS: Cấu hình mặc định
+        // ======================================================
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.family = 'Outfit';
+
+        // ======================================================
+        // 1. PIE CHART: Phân phối ICU vs Không ICU
+        // ======================================================
+        (function () {
+            var ctx = document.getElementById('chart-icu-pie');
+            if (!ctx) return;
+            var pie = SERVER_DATA.pieData;
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['ICU', 'Không ICU'],
+                    datasets: [{
+                        data: [pie.icu || 0, pie.non_icu || 0],
+                        backgroundColor: ['rgba(244,63,94,0.75)', 'rgba(99,102,241,0.65)'],
+                        borderColor: ['#f43f5e', '#6366f1'],
+                        borderWidth: 2,
+                        hoverOffset: 8
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '62%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#94a3b8', font: { family: 'Outfit', size: 12 }, padding: 16 } },
+                        tooltip: { callbacks: { label: function(c) { return ' ' + c.label + ': ' + c.parsed + ' ca (' + (SERVER_DATA.stats.total_patients > 0 ? Math.round(c.parsed / SERVER_DATA.stats.total_patients * 100) : 0) + '%)'; } } }
+                    }
+                }
+            });
+            var el = document.getElementById('pie-analysis-text');
+            if (el) {
+                if (SERVER_DATA.stats.total_patients > 0) {
+                    el.innerHTML = 'Tổng cộng có <strong>' + pie.icu + '</strong> bệnh nhân đang điều trị tại ICU, chiếm tỉ lệ <strong>' + pie.icu_rate + '%</strong> trên tổng số <strong>' + SERVER_DATA.stats.total_patients + '</strong> bệnh nhân.';
+                } else {
+                    el.textContent = 'Không có dữ liệu bệnh nhân để hiển thị.';
+                }
+            }
+        })();
+
+        // ======================================================
+        // 2. BAR CHART: Tỷ lệ ICU theo nhóm tuổi
+        // ======================================================
+        (function () {
+            var ctx = document.getElementById('chart-age-bar');
+            if (!ctx) return;
+            var barData = SERVER_DATA.barData;
+            var labels = barData.map(function(d) { return d.age_group + ' tuổi'; });
+            var totals = barData.map(function(d) { return d.total_patients; });
+            var icus   = barData.map(function(d) { return d.icu_patients; });
+            var rates  = barData.map(function(d) { return d.icu_rate; });
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Tổng bệnh nhân', data: totals, backgroundColor: 'rgba(99,102,241,0.5)', borderColor: '#6366f1', borderWidth: 1.5, borderRadius: 6, yAxisID: 'y' },
+                        { label: 'Bệnh nhân ICU', data: icus, backgroundColor: 'rgba(244,63,94,0.6)', borderColor: '#f43f5e', borderWidth: 1.5, borderRadius: 6, yAxisID: 'y' },
+                        { label: 'Tỷ lệ ICU (%)', data: rates, type: 'line', borderColor: '#f97316', backgroundColor: 'transparent', borderWidth: 2.5, pointBackgroundColor: '#f97316', pointRadius: 5, tension: 0.35, yAxisID: 'yRate' }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        y: { position: 'left', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', precision: 0 }, title: { display: true, text: 'Số bệnh nhân', color: '#94a3b8' } },
+                        yRate: { position: 'right', min: 0, max: 100, grid: { drawOnChartArea: false }, ticks: { color: '#f97316', callback: function(v) { return v + '%'; } }, title: { display: true, text: 'Tỷ lệ ICU (%)', color: '#f97316' } },
+                        x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#94a3b8' } }
+                    },
+                    plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 } } } }
+                }
+            });
+            var el = document.getElementById('bar-analysis-text');
+            if (el && barData.length > 0) {
+                var maxGroup = barData.reduce(function(a, b) { return (b.icu_rate > a.icu_rate && b.total_patients > 0) ? b : a; }, { icu_rate: -1, age_group: '' });
+                el.innerHTML = maxGroup.icu_rate > 0
+                    ? 'Nhóm tuổi có tỉ lệ ICU cao nhất là <strong>' + maxGroup.age_group + ' tuổi</strong> với <strong>' + maxGroup.icu_rate + '%</strong>.'
+                    : 'Không ghi nhận ca bệnh nào điều trị tại khoa ICU.';
+            }
+        })();
+
+        // ======================================================
+        // 3. LINE CHART: Chỉ số sức khỏe theo nhóm tuổi
+        // ======================================================
+        var lineChartInstance = null;
+        (function () {
+            var ctx = document.getElementById('chart-metrics-line');
+            if (!ctx) return;
+            var lineData = SERVER_DATA.lineData;
+            var labels = lineData.map(function(d) { return d.age_group + ' tuổi'; });
+            lineChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Nhịp tim trung bình (BPM)',
+                            data: lineData.map(function(d) { return d.avg_heart_rate; }),
+                            borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,0.1)',
+                            borderWidth: 3, pointBackgroundColor: '#f43f5e', pointBorderColor: '#fff', pointRadius: 5, pointHoverRadius: 7, tension: 0.35, yAxisID: 'yHeart'
+                        },
+                        {
+                            label: 'SpO2 trung bình (%)',
+                            data: lineData.map(function(d) { return d.avg_oxygen_saturation; }),
+                            borderColor: '#14b8a6', backgroundColor: 'rgba(20,184,166,0.1)',
+                            borderWidth: 3, pointBackgroundColor: '#14b8a6', pointBorderColor: '#fff', pointRadius: 5, pointHoverRadius: 7, tension: 0.35, yAxisID: 'yOxygen'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 12 } } } },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#94a3b8' } },
+                        yHeart: { type: 'linear', position: 'left', min: 50, max: 130, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#f43f5e' }, title: { display: true, text: 'Nhịp tim (BPM)', color: '#f43f5e', font: { weight: 'bold' } } },
+                        yOxygen: { type: 'linear', position: 'right', min: 80, max: 100, grid: { drawOnChartArea: false }, ticks: { color: '#14b8a6' }, title: { display: true, text: 'SpO2 (%)', color: '#14b8a6', font: { weight: 'bold' } } }
+                    }
+                }
+            });
+            var el = document.getElementById('line-analysis-text');
+            if (el && lineData.length > 1) {
+                var first = lineData[0], last = lineData[lineData.length - 1];
+                if (first.avg_oxygen_saturation > 0 && last.avg_oxygen_saturation > 0) {
+                    var diff = (first.avg_oxygen_saturation - last.avg_oxygen_saturation).toFixed(1);
+                    el.innerHTML = 'Nhóm trẻ tuổi (0-19) đạt SpO2 trung bình <strong>' + first.avg_oxygen_saturation + '%</strong>, trong khi nhóm cao tuổi (80+) giảm xuống còn <strong>' + last.avg_oxygen_saturation + '%</strong> (giảm ' + diff + '%).';
+                } else {
+                    el.textContent = 'Nhịp tim bình thường: 60-100 BPM; SpO2 tối ưu: 95-100%.';
+                }
+            }
+        })();
+
+        function updateLineChartMetric(metric) {
+            if (!lineChartInstance) return;
+            lineChartInstance.setDatasetVisibility(0, metric === 'both' || metric === 'heart');
+            lineChartInstance.setDatasetVisibility(1, metric === 'both' || metric === 'oxygen');
+            lineChartInstance.update();
+            ['btn-both','btn-heart','btn-oxygen'].forEach(function(id) {
+                var btn = document.getElementById(id);
+                if (btn) btn.classList.remove('active');
+            });
+            var active = document.getElementById('btn-' + metric);
+            if (active) active.classList.add('active');
+        }
+
+        // ======================================================
+        // 4. BẢNG DỮ LIỆU: Tìm kiếm, lọc, phân trang
+        // ======================================================
+        (function () {
+            var rows = Array.from(document.querySelectorAll('#patient-table-body tr'));
+            var searchInput = document.getElementById('patient-search');
+            var filterIcu   = document.getElementById('filter-icu');
+            var filterAge   = document.getElementById('filter-age');
+            var rowCountEl  = document.getElementById('table-row-count');
+            var pagination  = document.getElementById('table-pagination');
+            var currentPage = 1;
+            var rowsPerPage = 10;
+
+            function getAgeGroup(age) {
+                if (age < 20) return '0-19';
+                if (age < 40) return '20-39';
+                if (age < 60) return '40-59';
+                if (age < 80) return '60-79';
+                return '80+';
+            }
+
+            function applyFilters() {
+                var search = searchInput ? searchInput.value.toLowerCase() : '';
+                var icu    = filterIcu   ? filterIcu.value   : 'all';
+                var age    = filterAge   ? filterAge.value   : 'all';
+                var visible = rows.filter(function(row) {
+                    var cells = row.querySelectorAll('td');
+                    if (!cells.length) return true;
+                    var name    = (cells[1] ? cells[1].textContent : '').toLowerCase();
+                    var ageVal  = parseInt(cells[2] ? cells[2].textContent : '0', 10);
+                    var icuVal  = cells[4] ? cells[4].textContent.trim() : '';
+                    var searchOk = !search || name.includes(search);
+                    var icuOk    = icu === 'all' || (icu === 'icu' ? icuVal.includes('ICU') : !icuVal.includes('ICU'));
+                    var ageOk    = age === 'all' || getAgeGroup(ageVal) === age;
+                    return searchOk && icuOk && ageOk;
+                });
+                currentPage = 1;
+                renderPage(visible);
+            }
+
+            function renderPage(visible) {
+                var totalPages = Math.max(1, Math.ceil(visible.length / rowsPerPage));
+                var start = (currentPage - 1) * rowsPerPage;
+                var end   = start + rowsPerPage;
+                rows.forEach(function(r) { r.style.display = 'none'; });
+                visible.slice(start, end).forEach(function(r) { r.style.display = ''; });
+                if (rowCountEl) rowCountEl.textContent = 'Hiển thị ' + Math.min(visible.length, end - start) + ' / ' + visible.length + ' bệnh nhân';
+                renderPagination(totalPages, visible);
+            }
+
+            function renderPagination(totalPages, visible) {
+                if (!pagination) return;
+                pagination.innerHTML = '';
+                if (totalPages <= 1) return;
+                function makeBtn(label, page, disabled, active) {
+                    var btn = document.createElement('button');
+                    btn.className = 'btn btn-secondary btn-sm' + (active ? ' active' : '');
+                    btn.textContent = label;
+                    btn.disabled = disabled;
+                    btn.style.minWidth = '2rem';
+                    btn.addEventListener('click', function() { currentPage = page; renderPage(visible); });
+                    return btn;
+                }
+                pagination.appendChild(makeBtn('«', 1, currentPage === 1, false));
+                pagination.appendChild(makeBtn('‹', currentPage - 1, currentPage === 1, false));
+                for (var i = 1; i <= totalPages; i++) {
+                    if (i === 1 || i === totalPages || Math.abs(i - currentPage) <= 1) {
+                        pagination.appendChild(makeBtn(i, i, false, i === currentPage));
+                    } else if (Math.abs(i - currentPage) === 2) {
+                        var dots = document.createElement('span');
+                        dots.textContent = '…';
+                        dots.style.padding = '0 0.25rem';
+                        pagination.appendChild(dots);
+                    }
+                }
+                pagination.appendChild(makeBtn('›', currentPage + 1, currentPage === totalPages, false));
+                pagination.appendChild(makeBtn('»', totalPages, currentPage === totalPages, false));
+            }
+
+            if (searchInput) searchInput.addEventListener('input', applyFilters);
+            if (filterIcu)   filterIcu.addEventListener('change', applyFilters);
+            if (filterAge)   filterAge.addEventListener('change', applyFilters);
+            applyFilters();
+
+            // Xóa tất cả bệnh nhân
+            var btnClear = document.getElementById('btn-clear-db');
+            var notif = document.getElementById('notification-container');
+            function showNotif(msg, type) {
+                if (!notif) return;
+                var n = document.createElement('div');
+                n.className = 'notification ' + (type || 'success');
+                n.innerHTML = '<i class="fa-solid ' + (type === 'error' ? 'fa-circle-xmark' : 'fa-circle-check') + '"></i> ' + msg;
+                notif.appendChild(n);
+                setTimeout(function() { n.classList.add('fade-out'); setTimeout(function() { n.remove(); }, 500); }, 4000);
+            }
+            if (btnClear) {
+                btnClear.addEventListener('click', function() {
+                    if (!confirm('Xác nhận xóa TOÀN BỘ bệnh nhân khỏi cơ sở dữ liệu?')) return;
+                    fetch('/api/patients', { method: 'DELETE' })
+                        .then(function(r) { return r.json(); })
+                        .then(function(d) {
+                            showNotif(d.message || 'Đã xóa toàn bộ.', 'success');
+                            setTimeout(function() { location.reload(); }, 1500);
+                        })
+                        .catch(function() { showNotif('Lỗi kết nối khi xóa.', 'error'); });
+                });
+            }
+        })();
+
+        // ======================================================
+        // 5. MA TRẬN RỦI RO: Tải dữ liệu & tương tác
+        // ======================================================
+        (function() {
+            function loadRiskMatrix() {
+                fetch('/api/patients/risk-matrix')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        var counts = {};
+                        data.forEach(function(p) {
+                            var key = p.spo2_cat + '-' + p.hr_cat;
+                            counts[key] = (counts[key] || 0) + 1;
+                        });
+                        Object.keys(counts).forEach(function(key) {
+                            var el = document.getElementById('cell-' + key);
+                            if (el) el.textContent = counts[key];
+                        });
+                        // Click to filter
+                        document.querySelectorAll('.matrix-cell').forEach(function(cell) {
+                            cell.style.cursor = 'pointer';
+                            cell.addEventListener('click', function() {
+                                var spo2 = cell.dataset.spo2, hr = cell.dataset.hr;
+                                var filtered = data.filter(function(p) { return p.spo2_cat === spo2 && p.hr_cat === hr; });
+                                renderMatrixFilteredTable(filtered, spo2, hr);
+                            });
+                        });
+                        // Treemap
+                        renderTreemap(data);
+                    }).catch(function() {});
+            }
+
+            function renderMatrixFilteredTable(patients, spo2, hr) {
+                var card = document.getElementById('matrix-filtered-card');
+                var tbody = document.getElementById('matrix-filtered-tbody');
+                var title = document.getElementById('matrix-filter-title');
+                if (!card || !tbody) return;
+                card.classList.remove('hidden');
+                if (title) title.innerHTML = '<i class="fa-solid fa-hospital-user"></i> Bệnh nhân: SpO2=' + spo2 + ' / HR=' + hr + ' (' + patients.length + ' ca)';
+                tbody.innerHTML = patients.map(function(p) {
+                    return '<tr><td>' + p.id + '</td><td>' + p.name + '</td><td>' + p.age + '</td><td>' + p.gender + '</td>' +
+                           '<td>' + (p.icu ? '<span class="badge danger">ICU</span>' : '<span class="badge safe">Thường</span>') + '</td>' +
+                           '<td>' + p.heart_rate + '</td><td>' + p.oxygen_saturation + '</td><td>' + p.admission_date + '</td></tr>';
+                }).join('') || '<tr><td colspan="8" class="text-center">Không có bệnh nhân</td></tr>';
+                var closeBtn = document.getElementById('btn-close-matrix-filter');
+                if (closeBtn) closeBtn.onclick = function() { card.classList.add('hidden'); };
+            }
+
+            function renderTreemap(data) {
+                var container = document.getElementById('treemap-container');
+                if (!container) return;
+                container.innerHTML = '';
+                container.style.position = 'relative';
+                var groups = {};
+                data.forEach(function(p) {
+                    var g = p.spo2_cat + '-' + p.hr_cat;
+                    if (!groups[g]) groups[g] = { label: g, count: 0, icu: 0 };
+                    groups[g].count++;
+                    if (p.icu) groups[g].icu++;
+                });
+                var arr = Object.values(groups).sort(function(a,b) { return b.count - a.count; });
+                var total = arr.reduce(function(s,d) { return s + d.count; }, 0);
+                if (total === 0) { container.innerHTML = '<div class="text-center text-muted py-5">Không có dữ liệu</div>'; return; }
+                var W = container.clientWidth || 600, H = 320;
+                var rx = 0, ry = 0, rw = W, rh = H;
+                arr.forEach(function(item, i) {
+                    var share = item.count / arr.slice(i).reduce(function(s,d) { return s + d.count; }, 0);
+                    var w, h, x, y;
+                    if (rw >= rh) { w = rw * share; h = rh; x = rx; y = ry; rx += w; rw -= w; }
+                    else          { w = rw; h = rh * share; x = rx; y = ry; ry += h; rh -= h; }
+                    var icuRate = total > 0 ? Math.round(item.icu / item.count * 100) : 0;
+                    var bg = icuRate > 50 ? 'rgba(244,63,94,0.25)' : icuRate > 20 ? 'rgba(249,115,22,0.25)' : 'rgba(16,185,129,0.25)';
+                    var bd = icuRate > 50 ? 'rgba(244,63,94,0.6)' : icuRate > 20 ? 'rgba(249,115,22,0.6)' : 'rgba(16,185,129,0.6)';
+                    var div = document.createElement('div');
+                    div.className = 'treemap-block';
+                    div.style.cssText = 'position:absolute;left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px;box-sizing:border-box;background:'+bg+';border:1px solid '+bd+';border-radius:6px;padding:0.5rem;overflow:hidden;';
+                    div.innerHTML = '<div style="font-size:0.75rem;color:#94a3b8;">'+item.label+'</div><div style="font-weight:700;">'+item.count+' BN</div><div style="font-size:0.7rem;color:'+bd+';">ICU: '+icuRate+'%</div>';
+                    container.appendChild(div);
+                });
+                var el = document.getElementById('treemap-analysis-text');
+                if (el) el.innerHTML = 'Biểu đồ Treemap phân loại <strong>' + total + '</strong> bệnh nhân theo SpO2 và nhịp tim. Màu đỏ = nguy cơ ICU cao (&gt;50%).';
+            }
+
+            loadRiskMatrix();
+        })();
+
+        // ======================================================
+        // 6. CHUỖI THỜI GIAN & DỰ BÁO
+        // ======================================================
+        (function() {
+            function loadTimeSeriesAndForecast() {
+                Promise.all([
+                    fetch('/api/patients/time-series').then(function(r) { return r.json(); }),
+                    fetch('/api/patients/forecast').then(function(r) { return r.json(); })
+                ]).then(function(results) {
+                    renderTimeSeriesChart(results[0]);
+                    renderForecastChart(results[0], results[1]);
+                }).catch(function() {});
+            }
+
+            function renderTimeSeriesChart(data) {
+                var ctx = document.getElementById('chart-timeseries-line');
+                if (!ctx) return;
+                var labels = data.map(function(d) { return d.admission_date; });
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'Lượt nhập viện', data: data.map(function(d) { return d.patient_count; }), type: 'bar', backgroundColor: 'rgba(99,102,241,0.3)', borderColor: '#6366f1', borderWidth: 1.5, yAxisID: 'y1' },
+                            { label: 'Nhịp tim TB (BPM)', data: data.map(function(d) { return d.avg_heart_rate; }), borderColor: '#f43f5e', backgroundColor: 'transparent', borderWidth: 2.5, tension: 0.3, pointRadius: 4, yAxisID: 'y' },
+                            { label: 'SpO2 TB (%)', data: data.map(function(d) { return d.avg_oxygen_saturation; }), borderColor: '#14b8a6', backgroundColor: 'transparent', borderWidth: 2.5, tension: 0.3, pointRadius: 4, yAxisID: 'y' }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { color: '#f8fafc' } } },
+                        scales: {
+                            y: { position: 'left', min: 50, max: 130, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' }, title: { display: true, text: 'Chỉ số (BPM / SpO2)', color: '#94a3b8' } },
+                            y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#94a3b8', precision: 0 }, title: { display: true, text: 'Số bệnh nhân', color: '#94a3b8' } },
+                            x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#94a3b8', maxRotation: 45 } }
+                        }
+                    }
+                });
+                var el = document.getElementById('timeseries-analysis-text');
+                if (el && data.length > 0) {
+                    var total = data.reduce(function(s,d) { return s + d.patient_count; }, 0);
+                    var avgSpO2 = Math.round(data.reduce(function(s,d) { return s + d.avg_oxygen_saturation; }, 0) / data.length);
+                    var avgHR   = Math.round(data.reduce(function(s,d) { return s + d.avg_heart_rate; }, 0) / data.length);
+                    el.innerHTML = '<i class="fa-solid fa-circle-info"></i> <strong>Nhận xét:</strong> Tổng <strong>' + total + '</strong> lượt nhập viện. SpO2 TB: <strong>' + avgSpO2 + '%</strong>, Nhịp tim TB: <strong>' + avgHR + ' BPM</strong>.';
+                } else if (el) {
+                    el.textContent = 'Không có dữ liệu chuỗi thời gian.';
+                }
+            }
+
+            function renderForecastChart(tsData, forecastData) {
+                var ctx = document.getElementById('chart-forecast-line');
+                if (!ctx) return;
+                var actualLabels   = tsData.map(function(d) { return d.admission_date; });
+                var forecastLabels = forecastData.map(function(d) { return d.admission_date; });
+                var allLabels = actualLabels.concat(forecastLabels);
+                var actualSeries   = tsData.map(function(d) { return d.patient_count; });
+                var forecastSeries = new Array(actualLabels.length).fill(null);
+                if (tsData.length > 0) forecastSeries[actualLabels.length - 1] = tsData[tsData.length - 1].patient_count;
+                forecastData.forEach(function(d) { forecastSeries.push(d.patient_count); actualSeries.push(null); });
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: allLabels,
+                        datasets: [
+                            { label: 'Số lượt nhập viện thực tế', data: actualSeries, borderColor: '#a855f7', backgroundColor: 'rgba(168,85,247,0.1)', borderWidth: 3, fill: true, tension: 0.25, pointRadius: 4 },
+                            { label: 'Xu hướng dự báo (7 ngày tới)', data: forecastSeries, borderColor: '#14b8a6', backgroundColor: 'transparent', borderWidth: 2.5, borderDash: [6,6], pointStyle: 'rectRot', pointRadius: 6, tension: 0.2 }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { color: '#f8fafc' } } },
+                        scales: {
+                            y: { min: 0, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', stepSize: 1 }, title: { display: true, text: 'Số bệnh nhân (Lượt)', color: '#94a3b8' } },
+                            x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#94a3b8', maxRotation: 45 } }
+                        }
+                    }
+                });
+                var el = document.getElementById('forecast-analysis-text');
+                if (el && forecastData.length > 0) {
+                    var total = Math.round(forecastData.reduce(function(s,d) { return s + d.patient_count; }, 0));
+                    var trend = forecastData[forecastData.length-1].patient_count > forecastData[0].patient_count ? 'tăng nhẹ' : 'giảm nhẹ';
+                    el.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <strong>Dự báo:</strong> Ước tính <strong>' + total + ' bệnh nhân mới</strong> trong 7 ngày tới. Xu hướng: <strong>' + trend + '</strong>.';
+                } else if (el) {
+                    el.textContent = 'Chưa đủ dữ liệu để dự báo xu hướng.';
+                }
+            }
+
+            loadTimeSeriesAndForecast();
+        })();
+
+        // ======================================================
+        // 7. PHÂN TÍCH SÂU (Advanced Stats)
+        // ======================================================
+        (function() {
+            fetch('/api/patients/advanced-stats')
+                .then(function(r) { return r.json(); })
+                .then(function(stats) {
+                    function setEl(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
+                    function setWidth(id, pct) { var el = document.getElementById(id); if (el) el.style.width = pct + '%'; }
+                    function corrDesc(c) {
+                        var a = Math.abs(c);
+                        if (a > 0.7) return (c < 0 ? 'Tương quan nghịch rất mạnh' : 'Tương quan thuận rất mạnh');
+                        if (a > 0.4) return (c < 0 ? 'Tương quan nghịch trung bình' : 'Tương quan thuận trung bình');
+                        if (a > 0.2) return (c < 0 ? 'Tương quan nghịch yếu' : 'Tương quan thuận yếu');
+                        return 'Không có tương quan rõ rệt';
+                    }
+                    setEl('stat-corr-age-spo2', stats.age_spo2_corr.toFixed(3));
+                    setWidth('progress-age-spo2', Math.abs(stats.age_spo2_corr) * 100);
+                    setEl('desc-age-spo2', corrDesc(stats.age_spo2_corr));
+                    setEl('stat-corr-age-hr', stats.age_hr_corr.toFixed(3));
+                    setWidth('progress-age-hr', Math.abs(stats.age_hr_corr) * 100);
+                    setEl('desc-age-hr', corrDesc(stats.age_hr_corr));
+                    setEl('stat-relative-risk', stats.relative_risk.toFixed(2) + 'x');
+                    setEl('desc-relative-risk', stats.relative_risk > 1
+                        ? 'Người ≥60 tuổi có nguy cơ vào ICU cao hơn ' + stats.relative_risk.toFixed(2) + 'x so với người trẻ.'
+                        : 'Không có sự chênh lệch rủi ro đáng kể giữa các nhóm tuổi.');
+                    // Báo cáo
+                    var p1 = document.getElementById('report-p1');
+                    if (p1) p1.innerHTML = 'Hệ số tương quan Pearson giữa tuổi và SpO2 là <strong>' + stats.age_spo2_corr.toFixed(3) + '</strong> (' + corrDesc(stats.age_spo2_corr) + '). Hệ số tương quan giữa tuổi và nhịp tim là <strong>' + stats.age_hr_corr.toFixed(3) + '</strong> (' + corrDesc(stats.age_hr_corr) + ').';
+                    var p2 = document.getElementById('report-p2');
+                    if (p2) p2.innerHTML = 'Trong tổng số <strong>' + (stats.elderly_total || 0) + '</strong> bệnh nhân ≥60 tuổi, có <strong>' + (stats.elderly_icu || 0) + '</strong> người điều trị ICU. Rủi ro tương đối (Relative Risk) là <strong>' + stats.relative_risk.toFixed(2) + 'x</strong> so với nhóm &lt;60 tuổi.';
+                    var list = document.getElementById('report-list');
+                    if (list) list.innerHTML = [
+                        'Ưu tiên theo dõi bệnh nhân ≥60 tuổi với SpO2 &lt;95% hoặc nhịp tim &gt;100 BPM.',
+                        'Bệnh nhân có SpO2 &lt;90% cần được xem xét nhập khoa ICU ngay lập tức.',
+                        'Thực hiện kiểm tra hô hấp định kỳ cho nhóm người cao tuổi có bệnh nền.',
+                        'Kết hợp dữ liệu nhịp tim và SpO2 để đánh giá nguy cơ toàn diện hơn.'
+                    ].map(function(s) { return '<li>' + s + '</li>'; }).join('');
+                }).catch(function() {});
+        })();
+
+        // ======================================================
+        // 8. UPLOAD AREA: Kéo thả & Nhấn để chọn file
         // ======================================================
         (function () {
             var uploadArea     = document.getElementById('upload-area');
@@ -546,38 +1073,23 @@
             var btnRemove      = document.getElementById('btn-remove-file');
             var btnSubmit      = document.getElementById('btn-upload-submit');
             var notifContainer = document.getElementById('notification-container');
-
             if (!uploadArea || !fileInput) return;
-
-            // --- Hiển thị thông báo ---
             function showNotification(message, type) {
-                type = type || 'success';
                 var notif = document.createElement('div');
-                notif.className = 'notification ' + type;
-                notif.innerHTML = '<i class="fa-solid ' + (type === 'success' ? 'fa-circle-check' : 'fa-circle-xmark') + '"></i> ' + message;
+                notif.className = 'notification ' + (type || 'success');
+                notif.innerHTML = '<i class="fa-solid ' + (type === 'error' ? 'fa-circle-xmark' : 'fa-circle-check') + '"></i> ' + message;
                 notifContainer.appendChild(notif);
-                setTimeout(function () {
-                    notif.classList.add('fade-out');
-                    setTimeout(function () { notif.remove(); }, 500);
-                }, 4000);
+                setTimeout(function() { notif.classList.add('fade-out'); setTimeout(function() { notif.remove(); }, 500); }, 4000);
             }
-
-            // --- Khi có file được chọn ---
             function handleFile(file) {
                 if (!file) return;
-                var name = file.name.toLowerCase();
-                if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
-                    showNotification('Chỉ hỗ trợ file .xlsx hoặc .xls!', 'error');
-                    return;
-                }
+                if (!file.name.toLowerCase().match(/\.(xlsx|xls)$/)) { showNotification('Chỉ hỗ trợ .xlsx hoặc .xls!', 'error'); return; }
                 fileNameSpan.textContent = file.name;
                 placeholder.classList.add('hidden');
                 fileInfo.classList.remove('hidden');
                 btnSubmit.classList.remove('hidden');
                 uploadArea.classList.add('has-file');
             }
-
-            // --- Reset về trạng thái ban đầu ---
             function resetUpload() {
                 fileInput.value = '';
                 placeholder.classList.remove('hidden');
@@ -585,94 +1097,39 @@
                 btnSubmit.classList.add('hidden');
                 uploadArea.classList.remove('has-file', 'drag-over');
             }
-
-            // --- Click vào vùng upload ---
-            uploadArea.addEventListener('click', function () {
-                fileInput.click();
-            });
-
-            // --- Chọn file qua input ---
-            fileInput.addEventListener('change', function () {
-                if (fileInput.files && fileInput.files.length > 0) {
-                    handleFile(fileInput.files[0]);
-                }
-            });
-
-            // --- Nút xoá file đã chọn ---
-            btnRemove.addEventListener('click', function (e) {
-                e.stopPropagation();
-                resetUpload();
-            });
-
-            // --- Kéo thả ---
-            uploadArea.addEventListener('dragover', function (e) {
-                e.preventDefault();
-                uploadArea.classList.add('drag-over');
-            });
-            uploadArea.addEventListener('dragleave', function () {
-                uploadArea.classList.remove('drag-over');
-            });
-            uploadArea.addEventListener('drop', function (e) {
-                e.preventDefault();
-                uploadArea.classList.remove('drag-over');
+            uploadArea.addEventListener('click', function() { fileInput.click(); });
+            fileInput.addEventListener('change', function() { if (fileInput.files && fileInput.files.length > 0) handleFile(fileInput.files[0]); });
+            btnRemove.addEventListener('click', function(e) { e.stopPropagation(); resetUpload(); });
+            uploadArea.addEventListener('dragover', function(e) { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+            uploadArea.addEventListener('dragleave', function() { uploadArea.classList.remove('drag-over'); });
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault(); uploadArea.classList.remove('drag-over');
                 var files = e.dataTransfer.files;
                 if (files && files.length > 0) {
                     handleFile(files[0]);
-                    // Gán file vào input để có thể đọc sau
-                    try {
-                        var dt = new DataTransfer();
-                        dt.items.add(files[0]);
-                        fileInput.files = dt.files;
-                    } catch (err) { /* Safari fallback - sẽ lưu file trong biến */ }
+                    try { var dt = new DataTransfer(); dt.items.add(files[0]); fileInput.files = dt.files; } catch(err) {}
                     window._droppedFile = files[0];
                 }
             });
-
-            // --- Nút "Import Dữ Liệu" ---
-            btnSubmit.addEventListener('click', function () {
-                var file = (fileInput.files && fileInput.files.length > 0)
-                    ? fileInput.files[0]
-                    : window._droppedFile;
-
-                if (!file) {
-                    showNotification('Vui lòng chọn file Excel trước!', 'error');
-                    return;
-                }
-
+            btnSubmit.addEventListener('click', function() {
+                var file = (fileInput.files && fileInput.files.length > 0) ? fileInput.files[0] : window._droppedFile;
+                if (!file) { showNotification('Vui lòng chọn file Excel trước!', 'error'); return; }
                 btnSubmit.disabled = true;
-                btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nhập dữ liệu...';
-
-                var formData = new FormData();
-                formData.append('file', file);
-
-                fetch('/api/patients/import', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(function (res) { return res.json(); })
-                .then(function (data) {
-                    if (data.status === 'success') {
-                        showNotification(data.message || 'Import thành công!', 'success');
-                        resetUpload();
-                        window._droppedFile = null;
-                        // Tải lại trang để cập nhật số liệu
-                        setTimeout(function () { location.reload(); }, 1500);
-                    } else {
-                        showNotification(data.detail || 'Import thất bại.', 'error');
-                    }
-                })
-                .catch(function (err) {
-                    showNotification('Lỗi kết nối: ' + err.message, 'error');
-                })
-                .finally(function () {
-                    btnSubmit.disabled = false;
-                    btnSubmit.innerHTML = '<i class="fa-solid fa-circle-check"></i> Import Dữ Liệu';
-                });
+                btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nhập...';
+                var fd = new FormData(); fd.append('file', file);
+                fetch('/api/patients/import', { method: 'POST', body: fd })
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) {
+                        if (d.status === 'success') { showNotification(d.message || 'Import thành công!', 'success'); resetUpload(); window._droppedFile = null; setTimeout(function() { location.reload(); }, 1500); }
+                        else { showNotification(d.detail || 'Import thất bại.', 'error'); }
+                    })
+                    .catch(function(e) { showNotification('Lỗi: ' + e.message, 'error'); })
+                    .finally(function() { btnSubmit.disabled = false; btnSubmit.innerHTML = '<i class="fa-solid fa-circle-check"></i> Import Dữ Liệu'; });
             });
         })();
 
         // ======================================================
-        // Cập nhật ngày hiện tại
+        // 9. NGÀY HIỆN TẠI
         // ======================================================
         (function () {
             var el = document.getElementById('current-date');
