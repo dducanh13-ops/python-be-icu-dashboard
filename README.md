@@ -1,6 +1,6 @@
-# Python Dashboard (FastAPI)
+# Python Dashboard
 
-Dashboard đơn giản dùng **FastAPI + Jinja2 + SQLite**.
+Repo này chạy bằng **Streamlit**.
 
 ## Yêu cầu
 
@@ -20,30 +20,17 @@ py -m venv .venv
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
-python -m uvicorn main:app --reload
+streamlit run streamlit_app.py
+
 ```
 
-Mở trình duyệt:
+Mở trình duyệt (Streamlit):
 
-- UI: http://127.0.0.1:8000/
-- Healthcheck: http://127.0.0.1:8000/ping
-- Swagger (API docs): http://127.0.0.1:8000/docs
-
-## Nếu bạn muốn dùng virtual env có sẵn trong repo
-
-Repo hiện có thư mục `venv/`. Bạn có thể thử:
-
-```powershell
-cd d:\dashboard\python-dashboard
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python -m uvicorn main:app --reload
-```
+- http://localhost:8501
 
 ## Ghi chú
 
-- Database SQLite nằm ở file `patients.db` (tự tạo/khởi tạo khi server start).
-- Static files được mount tại `/static` và template nằm trong `templates/`.
+- Database SQLite nằm ở file `patients.db` (tự tạo/khởi tạo khi app chạy).
 
 ## Troubleshooting nhanh
 

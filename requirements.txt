@@ -1,6 +1,4 @@
-fastapi
-uvicorn
-gunicorn
 openpyxl
-python-multipart
-jinja2
+streamlit
+pandas
+plotly
