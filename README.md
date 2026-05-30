@@ -2,6 +2,19 @@
 
 Repo này chạy bằng **Streamlit**.
 
+## Deploy lên Render (Streamlit)
+
+Nếu Render đang chạy lệnh mặc định kiểu `uvicorn main:app` thì sẽ báo lỗi `Could not import module "main"` vì dự án này **không phải FastAPI/ASGI**.
+
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**:
+
+```bash
+streamlit run streamlit_app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true
+```
+
+Gợi ý: repo đã có sẵn file `render.yaml` để Render đọc cấu hình tương ứng.
+
 ## Yêu cầu
 
 - Windows + Python 3.10+ (khuyến nghị 3.11)
