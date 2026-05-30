@@ -207,28 +207,10 @@ db.init_db()
 
 
 @st.cache_data
-def _build_sample_excel_bytes() -> bytes:
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Danh sách bệnh nhân"
-
-    headers = [
-        "Họ và Tên",
-        "Tuổi",
-        "Giới tính",
-        "ICU (1=Có, 0=Không)",
-        "Nhịp tim",
-        "SpO2 (%)",
-        "Ngày nhập viện (YYYY-MM-DD)",
-    ]
-    ws.append(headers)
-    ws.append(["Nguyễn Văn Anh", 45, "Nam", 0, 75, 98, "2026-05-20"])
-    ws.append(["Trần Thị Mai", 72, "Nữ", 1, 95, 91, "2026-05-20"])
-    ws.append(["Lê Hoàng Nam", 19, "Nam", 0, 80, 99, "2026-05-20"])
-
-    file_stream = BytesIO()
-    wb.save(file_stream)
-    return file_stream.getvalue()
+def _load_sirio_libanes_excel_bytes() -> bytes:
+    kaggle_path = os.path.join(os.path.dirname(__file__), "Kaggle_Sirio_Libanes_ICU_Prediction.xlsx")
+    with open(kaggle_path, "rb") as f:
+        return f.read()
 
 # Sidebar navigation
 st.sidebar.title("🏥 MedICU")
@@ -247,31 +229,26 @@ choice = st.sidebar.radio("Điều hướng", menu)
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Tải & Nhập Excel**")
 
-st.sidebar.download_button(
-    label="Tải Excel mẫu",
-    data=_build_sample_excel_bytes(),
-    file_name="mau_du_lieu_benh_nhan.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    width="stretch",
-)
-
 _kaggle_path = os.path.join(os.path.dirname(__file__), "Kaggle_Sirio_Libanes_ICU_Prediction.xlsx")
 if os.path.exists(_kaggle_path):
-    with open(_kaggle_path, "rb") as f:
-        st.sidebar.download_button(
-            label="Tải Excel Kaggle (Sirio Libanes)",
-            data=f.read(),
-            file_name=os.path.basename(_kaggle_path),
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            width="stretch",
-        )
+    st.sidebar.download_button(
+        label="Tải Excel mẫu",
+        data=_load_sirio_libanes_excel_bytes(),
+        file_name=os.path.basename(_kaggle_path),
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        width="stretch",
+    )
+else:
+    st.sidebar.warning("Không tìm thấy file Excel mẫu (Sirio Libanes) trong thư mục dự án.")
 
 uploaded_file = st.sidebar.file_uploader("Upload Excel", type=["xlsx", "xls"])
 if uploaded_file is not None:
     st.sidebar.caption(f"Đã chọn: {uploaded_file.name}")
     if st.sidebar.button("Import Dữ Liệu", type="primary", width="stretch"):
         try:
-            imported, skipped = _import_patients_from_excel_bytes(uploaded_file.getvalue())
+            with st.sidebar:
+                with st.spinner("Đang import dữ liệu..."):
+                    imported, skipped = _import_patients_from_excel_bytes(uploaded_file.getvalue())
             st.sidebar.success(f"Nhập thành công {imported} bệnh nhân. Bỏ qua {skipped} dòng lỗi.")
             st.rerun()
         except Exception as e:
